@@ -1,0 +1,5 @@
+# docker-compose.yml for Perfume Samples project
+
+version: '3.8'
+services:
+  # Define your services here
