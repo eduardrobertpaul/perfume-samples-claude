@@ -20,13 +20,7 @@
       ],
       "baseUrl": ".",
       "paths": {
-        "@/*": ["./src/*"],
-        "@/components/*": ["./src/components/*"],
-        "@/lib/*": ["./src/lib/*"],
-        "@/types/*": ["./src/types/*"],
-        "@/utils/*": ["./src/utils/*"],
-        "@/hooks/*": ["./src/hooks/*"],
-        "@/store/*": ["./src/store/*"]
+        "@/*": ["*"]
       },
       "forceConsistentCasingInFileNames": true,
       "allowSyntheticDefaultImports": true
@@ -35,6 +29,8 @@
       "next-env.d.ts",
       "**/*.ts",
       "**/*.tsx",
+      "**/*.js",
+      "**/*.jsx",
       ".next/types/**/*.ts"
     ],
     "exclude": [
