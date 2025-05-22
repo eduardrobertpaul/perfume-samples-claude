@@ -1,0 +1,265 @@
+// Prisma schema for Perfume Samples Platform
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Product {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @db.VarChar(255)
+  brand     String   @db.VarChar(100)
+  description String?
+  aiGeneratedDescription String? @map("ai_generated_description")
+  
+  // Fragrance notes stored as arrays
+  topNotes    String[] @map("top_notes")
+  middleNotes String[] @map("middle_notes")
+  baseNotes   String[] @map("base_notes")
+  
+  // Pricing for different sizes
+  price2ml  Decimal? @map("price_2ml") @db.Decimal(8, 2)
+  price5ml  Decimal? @map("price_5ml") @db.Decimal(8, 2)
+  price10ml Decimal? @map("price_10ml") @db.Decimal(8, 2)
+  
+  // Stock and availability
+  inStock         Boolean @default(true) @map("in_stock")
+  bottleSizeOwned Int?    @map("bottle_size_owned")
+  
+  // SEO and display
+  slug     String  @unique @db.VarChar(255)
+  imageUrl String? @map("image_url") @db.VarChar(500)
+  category String? @db.VarChar(50) // designer, niche, fresh, oriental
+  gender   String? @db.VarChar(20) // unisex, masculine, feminine
+  
+  // Metadata
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  
+  // Relations
+  inventory            Inventory[]
+  orderItems           OrderItem[]
+  reviews              Review[]
+  discoverySetItems    DiscoverySetItem[]
+  analyticsEvents      AnalyticsEvent[]
+  
+  @@map("products")
+  @@index([brand])
+  @@index([category])
+  @@index([slug])
+  @@index([inStock])
+}
+
+model Inventory {
+  id        String   @id @default(uuid()) @db.Uuid
+  productId String   @map("product_id") @db.Uuid
+  
+  // Volume tracking
+  bottleSizeMl    Int     @map("bottle_size_ml")
+  totalVolume     Decimal @map("total_volume") @db.Decimal(8, 2)
+  usedVolume      Decimal @default(0) @map("used_volume") @db.Decimal(8, 2)
+  
+  // Cost tracking
+  costPerMl    Decimal?  @map("cost_per_ml") @db.Decimal(8, 4)
+  purchaseDate DateTime? @map("purchase_date") @db.Date
+  supplier     String?   @db.VarChar(100)
+  
+  // Alerts
+  lowStockThreshold Decimal @default(10) @map("low_stock_threshold") @db.Decimal(8, 2)
+  
+  // Metadata
+  lastUpdated DateTime @default(now()) @map("last_updated")
+  notes       String?
+  
+  // Relations
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  @@map("inventory")
+  @@index([productId])
+}
+
+model Order {
+  id          String @id @default(uuid()) @db.Uuid
+  orderNumber String @unique @map("order_number") @db.VarChar(20)
+  
+  // Customer info
+  customerEmail String  @map("customer_email") @db.VarChar(255)
+  customerPhone String? @map("customer_phone") @db.VarChar(20)
+  customerName  String? @map("customer_name") @db.VarChar(100)
+  
+  // Shipping
+  shippingAddressLine1 String  @map("shipping_address_line1") @db.VarChar(255)
+  shippingAddressLine2 String? @map("shipping_address_line2") @db.VarChar(255)
+  shippingCity         String  @default("Bucharest") @map("shipping_city") @db.VarChar(100)
+  shippingPostalCode   String? @map("shipping_postal_code") @db.VarChar(20)
+  shippingCountry      String  @default("Romania") @map("shipping_country") @db.VarChar(50)
+  
+  // Order details
+  totalAmount   Decimal @map("total_amount") @db.Decimal(10, 2)
+  shippingCost  Decimal @default(0) @map("shipping_cost") @db.Decimal(8, 2)
+  taxAmount     Decimal @default(0) @map("tax_amount") @db.Decimal(8, 2)
+  
+  // Status tracking
+  status        OrderStatus   @default(PENDING)
+  paymentStatus PaymentStatus @default(PENDING) @map("payment_status")
+  paymentMethod String?       @map("payment_method") @db.VarChar(20)
+  stripePaymentIntentId String? @map("stripe_payment_intent_id") @db.VarChar(255)
+  
+  // Delivery
+  deliveryType   DeliveryType @default(STANDARD) @map("delivery_type")
+  deliveryDate   DateTime?    @map("delivery_date") @db.Date
+  trackingNumber String?      @map("tracking_number") @db.VarChar(100)
+  
+  // Metadata
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  notes     String?
+  
+  // Relations
+  orderItems      OrderItem[]
+  reviews         Review[]
+  analyticsEvents AnalyticsEvent[]
+  
+  @@map("orders")
+  @@index([status])
+  @@index([customerEmail])
+  @@index([createdAt])
+  @@index([orderNumber])
+}
+
+model OrderItem {
+  id       String @id @default(uuid()) @db.Uuid
+  orderId  String @map("order_id") @db.Uuid
+  productId String @map("product_id") @db.Uuid
+  
+  // Item details
+  sizeMl    Int     @map("size_ml")
+  quantity  Int     @default(1)
+  unitPrice Decimal @map("unit_price") @db.Decimal(8, 2)
+  
+  // Custom options
+  customNotes  String? @map("custom_notes")
+  giftMessage  String? @map("gift_message")
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  // Relations
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+  
+  @@map("order_items")
+  @@index([orderId])
+  @@index([productId])
+}
+
+model DiscoverySet {
+  id          String  @id @default(uuid()) @db.Uuid
+  name        String  @db.VarChar(255)
+  description String?
+  theme       String? @db.VarChar(100) // summer, winter, niche, designer
+  
+  price    Decimal @db.Decimal(8, 2)
+  imageUrl String? @map("image_url") @db.VarChar(500)
+  isActive Boolean @default(true) @map("is_active")
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  
+  // Relations
+  discoverySetItems DiscoverySetItem[]
+  
+  @@map("discovery_sets")
+}
+
+model DiscoverySetItem {
+  id             String @id @default(uuid()) @db.Uuid
+  discoverySetId String @map("discovery_set_id") @db.Uuid
+  productId      String @map("product_id") @db.Uuid
+  sizeMl         Int    @default(2) @map("size_ml")
+  
+  // Relations
+  discoverySet DiscoverySet @relation(fields: [discoverySetId], references: [id], onDelete: Cascade)
+  product      Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  @@unique([discoverySetId, productId])
+  @@map("discovery_set_items")
+}
+
+model Review {
+  id       String @id @default(uuid()) @db.Uuid
+  productId String @map("product_id") @db.Uuid
+  orderId   String? @map("order_id") @db.Uuid
+  
+  customerEmail String  @map("customer_email") @db.VarChar(255)
+  rating        Int     @db.SmallInt
+  reviewText    String? @map("review_text")
+  
+  isVerified  Boolean @default(false) @map("is_verified")
+  isPublished Boolean @default(true) @map("is_published")
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  // Relations
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  order   Order?  @relation(fields: [orderId], references: [id])
+  
+  @@map("reviews")
+  @@index([productId])
+  @@index([isPublished])
+}
+
+model AnalyticsEvent {
+  id        String @id @default(uuid()) @db.Uuid
+  eventType String @map("event_type") @db.VarChar(50)
+  productId String? @map("product_id") @db.Uuid
+  orderId   String? @map("order_id") @db.Uuid
+  
+  // Event data
+  customerEmail String? @map("customer_email") @db.VarChar(255)
+  sessionId     String? @map("session_id") @db.VarChar(255)
+  userAgent     String?
+  ipAddress     String? @map("ip_address")
+  
+  // Additional data (JSON)
+  eventData Json? @map("event_data")
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  // Relations
+  product Product? @relation(fields: [productId], references: [id])
+  order   Order?   @relation(fields: [orderId], references: [id])
+  
+  @@map("analytics_events")
+  @@index([eventType])
+  @@index([createdAt])
+}
+
+// Enums
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  
+  @@map("order_status")
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+  
+  @@map("payment_status")
+}
+
+enum DeliveryType {
+  STANDARD
+  SAME_DAY
+  
+  @@map("delivery_type")
+}
